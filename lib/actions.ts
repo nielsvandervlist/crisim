@@ -531,12 +531,13 @@ export async function submitTrainingResponse(prevState: any, formData: FormData)
 export async function updateOrganization(prevState: any, formData: FormData) {
   const organizationId = formData.get("organizationId")
   const name = formData.get("name")
+  const slug = formData.get("slug")
   const description = formData.get("description")
   const website = formData.get("website")
   const industry = formData.get("industry")
 
-  if (!organizationId || !name) {
-    return { error: "Organization ID and name are required" }
+  if (!organizationId || !name || !slug) {
+    return { error: "Organization ID, name, and slug are required" }
   }
 
   const supabase = createClient()
@@ -564,6 +565,7 @@ export async function updateOrganization(prevState: any, formData: FormData) {
       .from("organizations")
       .update({
         name: name.toString(),
+        slug: slug.toString(),
         description: description?.toString() || null,
         website: website?.toString() || null,
         industry: industry?.toString() || null,
