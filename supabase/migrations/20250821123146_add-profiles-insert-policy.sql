@@ -1,0 +1,3 @@
+-- Add INSERT policy for profiles to allow users to create their own profile
+CREATE POLICY "Users can insert their own profile" ON profiles
+    FOR INSERT WITH CHECK (user_id = auth.uid());
