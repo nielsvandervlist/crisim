@@ -16,9 +16,14 @@ export async function signIn(prevState: any, formData: FormData) {
     return { error: "Email and password are required" }
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
 
   try {
+    // Simple login - no user creation logic
     const { error } = await supabase.auth.signInWithPassword({
       email: email.toString(),
       password: password.toString(),
@@ -35,11 +40,18 @@ export async function signIn(prevState: any, formData: FormData) {
   }
 }
 
-export async function signUp(prevState: any, formData: FormData) {
-  if (!formData) {
-    return { error: "Form data is missing" }
+export async function signOut() {
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    redirect("/auth/login")
   }
+  
+  await supabase.auth.signOut()
+  redirect("/auth/login")
+}
 
+export async function signUp(prevState: any, formData: FormData) {
   const email = formData.get("email")
   const password = formData.get("password")
   const fullName = formData.get("fullName")
@@ -47,173 +59,71 @@ export async function signUp(prevState: any, formData: FormData) {
   const organizationName = formData.get("organizationName")
 
   if (!email || !password || !fullName || !role) {
-    return { error: "All fields are required" }
+    return { error: "All required fields must be provided" }
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
 
   try {
-    // Sign up the user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Create the user account
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
       email: email.toString(),
       password: password.toString(),
-      options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-          `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/dashboard`,
-      },
     })
 
-    if (authError) {
-      return { error: authError.message }
+    if (signUpError) {
+      return { error: signUpError.message }
     }
 
-    if (authData.user) {
-      // Create organization if admin role
-      let orgId = null
-      if (role === "admin" && organizationName) {
-        const orgSlug = organizationName
-          .toString()
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-")
-        const { data: orgData, error: orgError } = await supabase
-          .from("organizations")
-          .insert({
-            name: organizationName.toString(),
-            slug: orgSlug,
-          })
-          .select()
-          .single()
+    if (!user) {
+      return { error: "Failed to create user account" }
+    }
 
-        if (orgError) {
-          console.error("Organization creation error:", orgError)
-          return { error: "Failed to create organization" }
-        }
-        orgId = orgData.id
+    let organizationId = null
+
+    // If user is admin and provided organization name, create organization
+    if (role === "admin" && organizationName) {
+      const { data: organization, error: orgError } = await supabase
+        .from("organizations")
+        .insert({
+          name: organizationName.toString(),
+          slug: organizationName.toString().toLowerCase().replace(/\s+/g, "-"),
+          description: `Organization created by ${fullName}`,
+        })
+        .select()
+        .single()
+
+      if (orgError) {
+        console.error("Organization creation error:", orgError)
+        return { error: "Failed to create organization" }
       }
 
-      // Create user profile
-      const profileData = {
-        id: authData.user.id,
+      organizationId = organization.id
+    }
+
+    // Create user profile
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert({
+        user_id: user.id,
         email: email.toString(),
         full_name: fullName.toString(),
         role: role.toString(),
-        ...(orgId && { organization_id: orgId }),
-      }
+        organization_id: organizationId,
+      })
 
-      console.log("[v0] Creating profile with data:", profileData)
-
-      const { error: profileError } = await supabase.from("profiles").insert(profileData)
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-        return { error: "Failed to create user profile" }
-      }
-
-      revalidatePath("/dashboard")
-      redirect("/dashboard")
+    if (profileError) {
+      console.error("Profile creation error:", profileError)
+      return { error: "Failed to create user profile" }
     }
+
+    return { success: "Account created successfully! Please check your email to verify your account." }
   } catch (error) {
     console.error("Sign up error:", error)
-    return { error: "An unexpected error occurred. Please try again." }
-  }
-}
-
-export async function signOut() {
-  const supabase = createClient()
-  await supabase.auth.signOut()
-  redirect("/auth/login")
-}
-
-export async function joinOrganization(prevState: any, formData: FormData) {
-  const organizationSlug = formData.get("organizationSlug")
-  const role = formData.get("role")
-
-  if (!organizationSlug || !role) {
-    return { error: "Organization and role are required" }
-  }
-
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
-  }
-
-  try {
-    // Find organization by slug
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("slug", organizationSlug.toString())
-      .single()
-
-    if (orgError || !org) {
-      return { error: "Organization not found" }
-    }
-
-    // Update user profile with organization
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        organization_id: org.id,
-        role: role.toString(),
-      })
-      .eq("id", user.id)
-
-    if (updateError) {
-      return { error: "Failed to join organization" }
-    }
-
-    revalidatePath("/dashboard")
-    return { success: "Successfully joined organization!" }
-  } catch (error) {
-    console.error("Join organization error:", error)
-    return { error: "An unexpected error occurred" }
-  }
-}
-
-export async function inviteMember(prevState: any, formData: FormData) {
-  const email = formData.get("email")
-  const role = formData.get("role")
-
-  if (!email || !role) {
-    return { error: "Email and role are required" }
-  }
-
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
-  }
-
-  try {
-    // Get current user's profile to check permissions
-    const { data: profile } = await supabase.from("profiles").select("role, organization_id").eq("id", user.id).single()
-
-    if (!profile || !["admin", "trainer"].includes(profile.role)) {
-      return { error: "You don't have permission to invite members" }
-    }
-
-    // Check if user already exists
-    const { data: existingUser } = await supabase.from("profiles").select("id").eq("email", email.toString()).single()
-
-    if (existingUser) {
-      return { error: "User with this email already exists" }
-    }
-
-    // For now, we'll just return success - in a real app, you'd send an email invitation
-    // TODO: Implement email invitation system
-    return {
-      success: `Invitation sent to ${email}. They can sign up and join your organization using the organization slug: ${profile.organization_id}`,
-    }
-  } catch (error) {
-    console.error("Invite member error:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -229,18 +139,24 @@ export async function createScenario(prevState: any, formData: FormData) {
     return { error: "All fields are required" }
   }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
   }
 
   try {
-    // Get user's profile to get organization_id
-    const { data: profile } = await supabase.from("profiles").select("organization_id, role").eq("id", user.id).single()
+    // Get current user and their organization
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
 
     if (!profile || !["admin", "trainer"].includes(profile.role)) {
       return { error: "You don't have permission to create scenarios" }
@@ -261,11 +177,12 @@ export async function createScenario(prevState: any, formData: FormData) {
       .single()
 
     if (error) {
+      console.error("Create scenario error:", error)
       return { error: "Failed to create scenario" }
     }
 
     revalidatePath("/dashboard/scenarios")
-    redirect(`/dashboard/scenarios/${scenario.id}`)
+    return { success: "Scenario created successfully!" }
   } catch (error) {
     console.error("Create scenario error:", error)
     return { error: "An unexpected error occurred" }
@@ -284,21 +201,39 @@ export async function updateScenario(prevState: any, formData: FormData) {
     return { error: "All fields are required" }
   }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
   }
 
   try {
-    // Get user's profile to check permissions
-    const { data: profile } = await supabase.from("profiles").select("organization_id, role").eq("id", user.id).single()
+    // Get current user and their organization
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
 
     if (!profile || !["admin", "trainer"].includes(profile.role)) {
       return { error: "You don't have permission to update scenarios" }
+    }
+
+    // Verify scenario belongs to organization
+    const { data: existingScenario } = await supabase
+      .from("scenarios")
+      .select("id")
+      .eq("id", scenarioId.toString())
+      .eq("organization_id", profile.organization_id)
+      .single()
+
+    if (!existingScenario) {
+      return { error: "Scenario not found or you don't have permission to edit it" }
     }
 
     const { error } = await supabase
@@ -318,6 +253,7 @@ export async function updateScenario(prevState: any, formData: FormData) {
       return { error: "Failed to update scenario" }
     }
 
+    revalidatePath("/dashboard/scenarios")
     revalidatePath(`/dashboard/scenarios/${scenarioId}`)
     return { success: "Scenario updated successfully!" }
   } catch (error) {
@@ -326,92 +262,33 @@ export async function updateScenario(prevState: any, formData: FormData) {
   }
 }
 
-export async function createDigitalExperience(prevState: any, formData: FormData) {
-  const scenarioId = formData.get("scenarioId")
-  const type = formData.get("type")
-  const platform = formData.get("platform")
-  const title = formData.get("title")
-  const content = formData.get("content")
-  const authorName = formData.get("authorName")
-  const timestampOffset = formData.get("timestampOffset")
-
-  if (!scenarioId || !type || !content) {
-    return { error: "Scenario, type, and content are required" }
-  }
-
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
-  }
-
-  try {
-    // Verify user has access to this scenario
-    const { data: profile } = await supabase.from("profiles").select("organization_id, role").eq("id", user.id).single()
-
-    if (!profile || !["admin", "trainer"].includes(profile.role)) {
-      return { error: "You don't have permission to create digital experiences" }
-    }
-
-    const { data: scenario } = await supabase
-      .from("scenarios")
-      .select("id")
-      .eq("id", scenarioId.toString())
-      .eq("organization_id", profile.organization_id)
-      .single()
-
-    if (!scenario) {
-      return { error: "Scenario not found" }
-    }
-
-    const { error } = await supabase.from("digital_experiences").insert({
-      scenario_id: scenarioId.toString(),
-      type: type.toString(),
-      platform: platform?.toString() || null,
-      title: title?.toString() || null,
-      content: content.toString(),
-      author_name: authorName?.toString() || null,
-      timestamp_offset: timestampOffset ? Number.parseInt(timestampOffset.toString()) : 0,
-    })
-
-    if (error) {
-      return { error: "Failed to create digital experience" }
-    }
-
-    revalidatePath(`/dashboard/scenarios/${scenarioId}`)
-    return { success: "Digital experience created successfully!" }
-  } catch (error) {
-    console.error("Create digital experience error:", error)
-    return { error: "An unexpected error occurred" }
-  }
-}
-
 export async function createTrainingSession(prevState: any, formData: FormData) {
   const title = formData.get("title")
   const scenarioId = formData.get("scenarioId")
   const startTime = formData.get("startTime")
-  const participants = formData.get("participants")
-  const participantRoles = formData.get("participantRoles")
 
   if (!title || !scenarioId) {
     return { error: "Title and scenario are required" }
   }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
   }
 
   try {
-    // Get user's profile to check permissions
-    const { data: profile } = await supabase.from("profiles").select("organization_id, role").eq("id", user.id).single()
+    // Get current user and their organization
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
 
     if (!profile || !["admin", "trainer"].includes(profile.role)) {
       return { error: "You don't have permission to create training sessions" }
@@ -447,27 +324,6 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
       return { error: "Failed to create training session" }
     }
 
-    // Add participants if provided
-    if (participants && participantRoles) {
-      const participantIds = JSON.parse(participants.toString())
-      const roles = JSON.parse(participantRoles.toString())
-
-      if (participantIds.length > 0) {
-        const participantInserts = participantIds.map((participantId: string) => ({
-          session_id: session.id,
-          participant_id: participantId,
-          role_assignment: roles[participantId] || "Participant",
-        }))
-
-        const { error: participantError } = await supabase.from("session_participants").insert(participantInserts)
-
-        if (participantError) {
-          console.error("Failed to add participants:", participantError)
-          // Don't fail the whole operation, just log the error
-        }
-      }
-    }
-
     revalidatePath("/dashboard/sessions")
     redirect(`/dashboard/sessions/${session.id}`)
   } catch (error) {
@@ -476,26 +332,107 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
   }
 }
 
-export async function submitTrainingResponse(prevState: any, formData: FormData) {
+export async function inviteParticipant(prevState: any, formData: FormData) {
   const sessionId = formData.get("sessionId")
-  const content = formData.get("content")
-  const responseType = formData.get("responseType") || "message"
+  const participantEmail = formData.get("participantEmail")
+  const roleAssignment = formData.get("roleAssignment") || "participant"
 
-  if (!sessionId || !content) {
-    return { error: "Session and content are required" }
+  if (!sessionId || !participantEmail) {
+    return { error: "Session ID and participant email are required" }
   }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
   }
 
   try {
-    // Verify user has access to this session
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || !["admin", "trainer"].includes(profile.role)) {
+      return { error: "You don't have permission to invite participants" }
+    }
+
+    // Find participant by email
+    const { data: participant } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("email", participantEmail.toString())
+      .single()
+
+    if (!participant) {
+      return { error: "Participant not found" }
+    }
+
+    // Verify session belongs to organization
+    const { data: session } = await supabase
+      .from("training_sessions")
+      .select("id")
+      .eq("id", sessionId.toString())
+      .eq("organization_id", profile.organization_id)
+      .single()
+
+    if (!session) {
+      return { error: "Session not found" }
+    }
+
+    // Add participant to session
+    const { error: inviteError } = await supabase
+      .from("session_participants")
+      .insert({
+        session_id: sessionId.toString(),
+        participant_id: participant.user_id,
+        role_assignment: roleAssignment.toString(),
+        status: "invited",
+      })
+
+    if (inviteError) {
+      return { error: "Failed to invite participant" }
+    }
+
+    revalidatePath(`/dashboard/sessions/${sessionId}`)
+    return { success: "Participant invited successfully!" }
+  } catch (error) {
+    console.error("Invite participant error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function submitResponse(prevState: any, formData: FormData) {
+  const sessionId = formData.get("sessionId")
+  const digitalExperienceId = formData.get("digitalExperienceId")
+  const responseContent = formData.get("responseContent")
+  const responseType = formData.get("responseType") || "reaction"
+
+  if (!sessionId || !responseContent) {
+    return { error: "Session ID and response content are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    // Verify user is participant in this session
     const { data: participant } = await supabase
       .from("session_participants")
       .select("session_id")
@@ -508,13 +445,16 @@ export async function submitTrainingResponse(prevState: any, formData: FormData)
     }
 
     // Create response
-    const { error } = await supabase.from("participant_responses").insert({
-      session_id: sessionId.toString(),
-      participant_id: user.id,
-      response_type: responseType.toString(),
-      content: content.toString(),
-      is_public: true,
-    })
+    const { error } = await supabase
+      .from("participant_responses")
+      .insert({
+        session_id: sessionId.toString(),
+        participant_id: user.id,
+        digital_experience_id: digitalExperienceId?.toString() || null,
+        response_type: responseType.toString(),
+        response_content: responseContent.toString(),
+        response_time: new Date().toISOString(),
+      })
 
     if (error) {
       return { error: "Failed to submit response" }
@@ -523,64 +463,237 @@ export async function submitTrainingResponse(prevState: any, formData: FormData)
     revalidatePath(`/dashboard/sessions/${sessionId}/training`)
     return { success: "Response submitted successfully!" }
   } catch (error) {
-    console.error("Submit training response error:", error)
+    console.error("Submit response error:", error)
     return { error: "An unexpected error occurred" }
   }
 }
 
-export async function updateOrganization(prevState: any, formData: FormData) {
-  const organizationId = formData.get("organizationId")
-  const name = formData.get("name")
-  const slug = formData.get("slug")
-  const description = formData.get("description")
-  const website = formData.get("website")
-  const industry = formData.get("industry")
+export async function uploadDocument(prevState: any, formData: FormData) {
+  const scenarioId = formData.get("scenarioId")
+  const title = formData.get("title")
+  const fileName = formData.get("fileName")
+  const filePath = formData.get("filePath")
+  const fileType = formData.get("fileType")
+  const fileSize = formData.get("fileSize")
 
-  if (!organizationId || !name || !slug) {
-    return { error: "Organization ID, name, and slug are required" }
+  if (!scenarioId || !title || !fileName || !filePath || !fileType) {
+    return { error: "All document fields are required" }
   }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: "You must be logged in" }
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
   }
 
   try {
-    // Get user's profile to check permissions
-    const { data: profile } = await supabase.from("profiles").select("organization_id, role").eq("id", user.id).single()
-
-    if (!profile || profile.role !== "admin") {
-      return { error: "You don't have permission to update organization settings" }
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
     }
 
-    if (profile.organization_id !== organizationId.toString()) {
-      return { error: "You can only update your own organization" }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || !["admin", "trainer"].includes(profile.role)) {
+      return { error: "You don't have permission to upload documents" }
     }
 
+    // Verify scenario belongs to organization
+    const { data: scenario } = await supabase
+      .from("scenarios")
+      .select("id")
+      .eq("id", scenarioId.toString())
+      .eq("organization_id", profile.organization_id)
+      .single()
+
+    if (!scenario) {
+      return { error: "Scenario not found" }
+    }
+
+    // Create document record
     const { error } = await supabase
-      .from("organizations")
-      .update({
-        name: name.toString(),
-        slug: slug.toString(),
-        description: description?.toString() || null,
-        website: website?.toString() || null,
-        industry: industry?.toString() || null,
-        updated_at: new Date().toISOString(),
+      .from("documents")
+      .insert({
+        scenario_id: scenarioId.toString(),
+        title: title.toString(),
+        file_name: fileName.toString(),
+        file_path: filePath.toString(),
+        file_type: fileType.toString(),
+        file_size: fileSize ? Number.parseInt(fileSize.toString()) : null,
+        uploaded_by: user.id,
       })
-      .eq("id", organizationId.toString())
 
     if (error) {
-      return { error: "Failed to update organization" }
+      return { error: "Failed to upload document" }
     }
 
-    revalidatePath("/dashboard/organization")
-    return { success: "Organization updated successfully!" }
+    revalidatePath(`/dashboard/scenarios/${scenarioId}`)
+    return { success: "Document uploaded successfully!" }
   } catch (error) {
-    console.error("Update organization error:", error)
+    console.error("Upload document error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function inviteMember(prevState: any, formData: FormData) {
+  const email = formData.get("email")
+  const role = formData.get("role")
+
+  if (!email || !role) {
+    return { error: "Email and role are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || profile.role !== "admin") {
+      return { error: "You don't have permission to invite members" }
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email.toString())
+      .single()
+
+    if (existingUser) {
+      return { error: "User with this email already exists" }
+    }
+
+    // For now, we'll just create a placeholder profile
+    // In a real implementation, you might want to send an email invitation
+    // and create the profile when they accept
+    const { error: inviteError } = await supabase
+      .from("profiles")
+      .insert({
+        email: email.toString(),
+        role: role.toString(),
+        organization_id: profile.organization_id,
+        full_name: null, // Will be set when user completes signup
+        user_id: null, // Will be set when user creates account
+      })
+
+    if (inviteError) {
+      console.error("Invite member error:", inviteError)
+      return { error: "Failed to invite member" }
+    }
+
+    revalidatePath("/dashboard/members")
+    revalidatePath("/dashboard/organization")
+    return { success: "Member invited successfully!" }
+  } catch (error) {
+    console.error("Invite member error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function createDigitalExperience(prevState: any, formData: FormData) {
+  const scenarioId = formData.get("scenarioId")
+  const typeName = formData.get("typeId") // This is actually the type name, not ID
+  const title = formData.get("title")
+  const content = formData.get("content")
+  const triggerTime = formData.get("triggerTime") || "0"
+  const platform = formData.get("platform")
+  const authorName = formData.get("authorName")
+  const urgencyLevel = formData.get("urgencyLevel")
+
+  if (!scenarioId || !typeName || !content) {
+    return { error: "Scenario, type, and content are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || !["admin", "trainer"].includes(profile.role)) {
+      return { error: "You don't have permission to create digital experiences" }
+    }
+
+    // Verify scenario belongs to organization
+    const { data: scenario } = await supabase
+      .from("scenarios")
+      .select("id")
+      .eq("id", scenarioId.toString())
+      .eq("organization_id", profile.organization_id)
+      .single()
+
+    if (!scenario) {
+      return { error: "Scenario not found" }
+    }
+
+    // Get the type_id from the type name
+    const { data: typeData, error: typeError } = await supabase
+      .from("digital_experience_types")
+      .select("id")
+      .eq("name", typeName.toString())
+      .single()
+
+    if (typeError || !typeData) {
+      return { error: "Invalid experience type" }
+    }
+
+    // Create digital experience
+    const { error } = await supabase
+      .from("digital_experiences")
+      .insert({
+        scenario_id: scenarioId.toString(),
+        type_id: typeData.id,
+        title: title?.toString() || null,
+        content: content.toString(),
+        trigger_time: Number.parseInt(triggerTime.toString()) * 60, // Convert minutes to seconds
+        metadata: {
+          platform: platform?.toString() || null,
+          author_name: authorName?.toString() || null,
+          urgency_level: urgencyLevel?.toString() || null,
+        },
+        created_by: user.id,
+      })
+
+    if (error) {
+      return { error: "Failed to create digital experience" }
+    }
+
+    revalidatePath(`/dashboard/scenarios/${scenarioId}`)
+    return { success: "Digital experience created successfully!" }
+  } catch (error) {
+    console.error("Create digital experience error:", error)
     return { error: "An unexpected error occurred" }
   }
 }

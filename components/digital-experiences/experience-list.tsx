@@ -43,14 +43,20 @@ export function ExperienceList({ experiences, canEdit = false }: ExperienceListP
     switch (type) {
       case "social_media":
         return <MessageCircle className="h-4 w-4 text-blue-500" />
-      case "news_article":
+      case "news":
         return <Newspaper className="h-4 w-4 text-red-600" />
       case "email":
         return <Mail className="h-4 w-4 text-gray-600" />
-      case "website":
+      case "video":
         return <Globe className="h-4 w-4 text-green-600" />
       case "document":
         return <FileText className="h-4 w-4 text-purple-600" />
+      case "phone_call":
+        return <MessageCircle className="h-4 w-4 text-orange-500" />
+      case "sms":
+        return <MessageCircle className="h-4 w-4 text-green-500" />
+      case "press_release":
+        return <FileText className="h-4 w-4 text-blue-600" />
       default:
         return <MessageCircle className="h-4 w-4 text-gray-500" />
     }
@@ -60,14 +66,20 @@ export function ExperienceList({ experiences, canEdit = false }: ExperienceListP
     switch (type) {
       case "social_media":
         return "bg-blue-100 text-blue-800"
-      case "news_article":
+      case "news":
         return "bg-red-100 text-red-800"
       case "email":
         return "bg-gray-100 text-gray-800"
-      case "website":
+      case "video":
         return "bg-green-100 text-green-800"
       case "document":
         return "bg-purple-100 text-purple-800"
+      case "phone_call":
+        return "bg-orange-100 text-orange-800"
+      case "sms":
+        return "bg-green-100 text-green-800"
+      case "press_release":
+        return "bg-blue-100 text-blue-800"
       default:
         return "bg-gray-100 text-gray-800"
     }

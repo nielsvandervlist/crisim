@@ -9,7 +9,11 @@ import { MembersList } from "@/components/organization/members-list"
 
 export default async function OrganizationPage() {
   const profile = await requireRole(["admin"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get organization stats
   const [membersResult, scenariosResult, sessionsResult] = await Promise.all([

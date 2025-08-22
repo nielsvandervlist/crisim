@@ -1,4 +1,4 @@
-import { getUserProfile } from "@/lib/auth"
+import { getServerUserProfile } from "@/lib/server-auth"
 import { createClient } from "@/lib/supabase/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,8 +12,12 @@ interface TrainingPageProps {
 }
 
 export default async function TrainingPage({ params }: TrainingPageProps) {
-  const profile = await getUserProfile()
-  const supabase = createClient()
+  const profile = await getServerUserProfile()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get session details with all related data
   const { data: session, error } = await supabase

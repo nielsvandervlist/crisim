@@ -11,7 +11,11 @@ interface EditScenarioPageProps {
 
 export default async function EditScenarioPage({ params }: EditScenarioPageProps) {
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get scenario details
   const { data: scenario, error } = await supabase

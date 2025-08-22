@@ -1,42 +1,45 @@
 "use client"
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Shield } from "lucide-react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { signIn } from "@/lib/actions"
-
-function SubmitButton() {
-  const { pending } = useFormStatus()
-
-  return (
-    <Button type="submit" disabled={pending} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Signing in...
-        </>
-      ) : (
-        "Sign In"
-      )}
-    </Button>
-  )
-}
+import { useAuth } from "@/lib/auth-provider"
 
 export default function LoginForm() {
   const router = useRouter()
-  const [state, formAction] = useActionState(signIn, null)
+  const { signIn } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (state?.success) {
-      router.push("/dashboard")
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    if (!email || !password) {
+      setError("Email and password are required")
+      setIsLoading(false)
+      return
     }
-  }, [state, router])
+
+    const result = await signIn(email, password)
+
+    if (result.error) {
+      setError(result.error)
+    } else {
+      // Redirect to dashboard on success
+      window.location.href = "/dashboard"
+    }
+    
+    setIsLoading(false)
+  }
 
   return (
     <Card className="w-full max-w-md">
@@ -48,10 +51,10 @@ export default function LoginForm() {
         <CardDescription>Sign in to your account</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="space-y-4">
-          {state?.error && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-              {state.error}
+              {error}
             </div>
           )}
 
@@ -69,13 +72,19 @@ export default function LoginForm() {
             <Input id="password" name="password" type="password" required className="w-full" />
           </div>
 
-          <SubmitButton />
+          <Button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
+          </Button>
 
           <div className="text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link href="/auth/signup" className="text-blue-600 hover:underline font-medium">
-              Sign up
-            </Link>
+            Contact your administrator for access
           </div>
         </form>
       </CardContent>

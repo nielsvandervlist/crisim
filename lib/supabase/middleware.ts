@@ -28,28 +28,34 @@ export async function updateSession(request: NextRequest) {
   if (code) {
     // Exchange the code for a session
     await supabase.auth.exchangeCodeForSession(code)
-    // Redirect to home page after successful auth
-    return NextResponse.redirect(new URL("/", request.url))
+    // Redirect to dashboard after successful auth
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   // Refresh session if expired - required for Server Components
   await supabase.auth.getSession()
 
+  // Get the current session
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
   // Protected routes - redirect to login if not authenticated
   const isAuthRoute =
     request.nextUrl.pathname.startsWith("/auth/login") ||
-    request.nextUrl.pathname.startsWith("/auth/signup") || // Fixed route path from /auth/sign-up to /auth/signup
+    request.nextUrl.pathname.startsWith("/auth/signup") ||
     request.nextUrl.pathname === "/auth/callback"
 
-  if (!isAuthRoute) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+  if (isAuthRoute && session) {
+    // User is authenticated and trying to access auth routes, redirect to dashboard
+    const redirectUrl = new URL("/dashboard", request.url)
+    return NextResponse.redirect(redirectUrl)
+  }
 
-    if (!session) {
-      const redirectUrl = new URL("/auth/login", request.url)
-      return NextResponse.redirect(redirectUrl)
-    }
+  if (!isAuthRoute && !session) {
+    // User is not authenticated and trying to access protected routes, redirect to login
+    const redirectUrl = new URL("/auth/login", request.url)
+    return NextResponse.redirect(redirectUrl)
   }
 
   return res

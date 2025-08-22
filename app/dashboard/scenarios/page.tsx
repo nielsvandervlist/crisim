@@ -9,18 +9,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 export default async function ScenariosPage() {
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get scenarios for the organization
-  const { data: scenarios } = await supabase
+  const { data: scenarios, error } = await supabase
     .from("scenarios")
     .select(`
       *,
-      creator:profiles!scenarios_created_by_fkey(full_name),
       digital_experiences(id)
     `)
     .eq("organization_id", profile.organization_id)
     .order("created_at", { ascending: false })
+
+  // Debug logging
+  console.log("Organization ID:", profile.organization_id)
+  console.log("Scenarios found:", scenarios?.length || 0)
+  console.log("Scenarios data:", scenarios)
+  console.log("Error:", error)
+
+  if (error) {
+    console.error("Error fetching scenarios:", error)
+  }
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -116,8 +129,7 @@ export default async function ScenariosPage() {
                   </div>
 
                   <div className="text-xs text-gray-500">
-                    Created by {scenario.creator?.full_name || "Unknown"} •{" "}
-                    {new Date(scenario.created_at).toLocaleDateString()}
+                    Created {new Date(scenario.created_at).toLocaleDateString()}
                   </div>
 
                   <div className="flex gap-2 pt-2">

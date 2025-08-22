@@ -15,25 +15,68 @@ interface ScenarioPageProps {
 }
 
 export default async function ScenarioPage({ params }: ScenarioPageProps) {
+  const awaitedParams = await params
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
 
-  // Get scenario details
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
+
+  // Get scenario details with related digital experiences
   const { data: scenario, error } = await supabase
     .from("scenarios")
     .select(`
       *,
-      creator:profiles!scenarios_created_by_fkey(full_name),
-      digital_experiences(*),
-      training_sessions(id, title, status, created_at)
+      digital_experiences (
+        id,
+        type_id,
+        title,
+        content,
+        metadata,
+        trigger_time,
+        created_at,
+        digital_experience_types (
+          name
+        )
+      ),
+      training_sessions (
+        id,
+        title,
+        status,
+        created_at
+      )
     `)
-    .eq("id", params.id)
-    .eq("organization_id", profile.organization_id)
+    .eq("id", awaitedParams.id)
     .single()
 
-  if (error || !scenario) {
+  // Debug logging
+  console.log("Scenario ID:", awaitedParams.id)
+  console.log("Organization ID:", profile.organization_id)
+  console.log("Scenario data:", scenario)
+  console.log("Error:", error)
+
+  if (error) {
+    console.error("Database error:", error)
     notFound()
   }
+
+  if (!scenario) {
+    console.log("No scenario found")
+    notFound()
+  }
+
+  // Transform digital experiences to match the expected interface
+  const transformedExperiences = scenario.digital_experiences?.map((exp: any) => ({
+    id: exp.id,
+    type: exp.digital_experience_types?.name || 'unknown',
+    platform: exp.metadata?.platform,
+    title: exp.title,
+    content: exp.content,
+    author_name: exp.metadata?.author_name,
+    timestamp_offset: exp.trigger_time || 0,
+    created_at: exp.created_at
+  })) || []
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -122,7 +165,7 @@ export default async function ScenarioPage({ params }: ScenarioPageProps) {
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <Target className="h-4 w-4 mr-2" />
-                    Experiences: {scenario.digital_experiences?.length || 0}
+                    Experiences: {transformedExperiences.length}
                   </div>
                 </div>
               </div>
@@ -146,7 +189,7 @@ export default async function ScenarioPage({ params }: ScenarioPageProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <ExperienceList experiences={scenario.digital_experiences || []} canEdit={true} />
+              <ExperienceList experiences={transformedExperiences} canEdit={true} />
             </CardContent>
           </Card>
         </div>

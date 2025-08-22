@@ -8,7 +8,11 @@ import { Users, Mail } from "lucide-react"
 
 export default async function MembersPage() {
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get organization members
   const { data: members } = await supabase

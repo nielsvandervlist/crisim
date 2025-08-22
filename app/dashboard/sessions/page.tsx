@@ -1,4 +1,4 @@
-import { getUserProfile } from "@/lib/auth"
+import { getServerUserProfile } from "@/lib/server-auth"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -7,8 +7,12 @@ import { Play, Clock, Users, Target, Plus } from "lucide-react"
 import Link from "next/link"
 
 export default async function SessionsPage() {
-  const profile = await getUserProfile()
-  const supabase = createClient()
+  const profile = await getServerUserProfile()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get training sessions based on user role
   let sessionsQuery = supabase

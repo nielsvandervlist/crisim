@@ -38,22 +38,24 @@ function SubmitButton() {
 
 const experienceTypes = [
   { value: "social_media", label: "Social Media Post" },
-  { value: "breaking_news", label: "Breaking News Alert" },
-  { value: "news_article", label: "News Article" },
+  { value: "news", label: "News Article" },
   { value: "email", label: "Email" },
+  { value: "video", label: "Video Content" },
   { value: "phone_call", label: "Phone Call" },
-  { value: "website", label: "Website Update" },
-  { value: "document", label: "Internal Document" },
+  { value: "document", label: "Document" },
+  { value: "sms", label: "Text Message" },
+  { value: "press_release", label: "Press Release" },
 ]
 
 const platformOptions = {
   social_media: ["Twitter", "Facebook", "LinkedIn", "Instagram", "Reddit"],
-  breaking_news: ["CNN Breaking", "BBC Alert", "Reuters Flash", "Emergency Alert"],
-  news_article: ["CNN", "BBC", "Reuters", "TechCrunch", "Local News", "Industry Publication"],
+  news: ["CNN", "BBC", "Reuters", "TechCrunch", "Local News", "Industry Publication"],
   email: ["Internal Email", "Customer Email", "Press Inquiry", "Vendor Communication"],
+  video: ["YouTube", "CNN Live", "BBC News", "Local TV", "Company Channel"],
   phone_call: ["Customer Call", "Media Inquiry", "Executive Call", "Emergency Contact"],
-  website: ["Company Website", "Government Site", "Industry Portal", "News Site"],
   document: ["Internal Memo", "Press Release", "Legal Document", "Technical Report"],
+  sms: ["Company Alert", "Emergency SMS", "Customer Service", "Internal Communication"],
+  press_release: ["Company PR", "Government PR", "Industry PR", "Emergency PR"],
 }
 
 const urgencyLevels = [
@@ -95,18 +97,20 @@ export function ExperienceForm({ scenarioId }: ExperienceFormProps) {
   const generateSampleContent = () => {
     const samples = {
       social_media: "Just heard about the incident at our main facility. Is everyone safe? #concerned #safety",
-      breaking_news:
-        "BREAKING: Major incident reported at corporate headquarters. Emergency services on scene. More details to follow.",
-      news_article:
+      news:
         "A significant incident has occurred at the company's main facility, prompting an immediate response from emergency services and company officials.",
       email:
         "Subject: Urgent - Incident Response Required\n\nTeam,\n\nWe have a developing situation that requires immediate attention. Please review the attached protocols and prepare for emergency response procedures.\n\nRegards,\nIncident Commander",
+      video:
+        "BREAKING: Major incident reported at corporate headquarters. Emergency services on scene. More details to follow.",
       phone_call:
         "This is Sarah from Channel 7 News. We're hearing reports about an incident at your facility. Can you provide a statement?",
-      website:
-        "Due to an ongoing incident, our main facility is temporarily closed. We are working with authorities to resolve the situation. Updates will be provided as they become available.",
       document:
         "INCIDENT REPORT #2024-001\n\nTime: [CURRENT TIME]\nLocation: Main Facility\nSeverity: High\nStatus: Active Response\n\nInitial assessment indicates immediate action required.",
+      sms:
+        "ALERT: Incident at main facility. All staff please evacuate immediately. Emergency services responding.",
+      press_release:
+        "FOR IMMEDIATE RELEASE\n\nCompany Name Responds to Facility Incident\n\n[City, Date] - Our company is currently responding to an incident at our main facility. The safety of our employees and the community is our top priority. We are working closely with emergency services and will provide updates as information becomes available.",
     }
 
     const sample = samples[experienceType as keyof typeof samples]
@@ -145,7 +149,7 @@ export function ExperienceForm({ scenarioId }: ExperienceFormProps) {
                   Experience Type *
                 </label>
                 <Select
-                  name="type"
+                  name="typeId"
                   value={experienceType}
                   onValueChange={(value) => {
                     setExperienceType(value)
@@ -211,7 +215,7 @@ export function ExperienceForm({ scenarioId }: ExperienceFormProps) {
                 </label>
                 <Input
                   id="timestampOffset"
-                  name="timestampOffset"
+                  name="triggerTime"
                   type="number"
                   min="0"
                   max="480"
@@ -239,10 +243,10 @@ export function ExperienceForm({ scenarioId }: ExperienceFormProps) {
               />
             </div>
 
-            {(experienceType === "news_article" ||
-              experienceType === "breaking_news" ||
-              experienceType === "website" ||
-              experienceType === "document") && (
+            {(experienceType === "news" ||
+              experienceType === "video" ||
+              experienceType === "document" ||
+              experienceType === "press_release") && (
               <div>
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                   Title/Headline
@@ -282,6 +286,11 @@ export function ExperienceForm({ scenarioId }: ExperienceFormProps) {
                 className="w-full"
               />
             </div>
+
+            {/* Hidden fields for additional metadata */}
+            <input type="hidden" name="platform" value={platform} />
+            <input type="hidden" name="authorName" value={authorName} />
+            <input type="hidden" name="urgencyLevel" value={urgencyLevel} />
 
             <div className="flex justify-between">
               <Button type="button" variant="outline" onClick={() => setShowPreview(!showPreview)}>

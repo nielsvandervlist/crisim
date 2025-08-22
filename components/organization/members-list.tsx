@@ -11,7 +11,11 @@ interface MembersListProps {
 }
 
 export async function MembersList({ organizationId }: MembersListProps) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   const { data: members } = await supabase
     .from("profiles")

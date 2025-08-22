@@ -1,44 +1,67 @@
 import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 
 export async function getCurrentUser() {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/auth/login")
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return null
   }
 
-  return user
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error || !user) {
+      return null
+    }
+
+    return user
+  } catch (error) {
+    console.error("Error getting current user:", error)
+    return null
+  }
 }
 
 export async function getUserProfile() {
-  const supabase = createClient()
-  const user = await getCurrentUser()
-
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select(`
-      *,
-      organization:organizations(*)
-    `)
-    .eq("id", user.id)
-    .single()
-
-  if (error || !profile) {
-    redirect("/auth/login")
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return null
   }
 
-  return profile
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return null
+    }
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select(`
+        *,
+        organization:organizations(*)
+      `)
+      .eq("user_id", user.id)
+      .single()
+
+    if (error || !profile) {
+      return null
+    }
+
+    return profile
+  } catch (error) {
+    console.error("Error getting user profile:", error)
+    return null
+  }
 }
 
 export async function requireRole(allowedRoles: string[]) {
   const profile = await getUserProfile()
 
-  if (!allowedRoles.includes(profile.role)) {
-    redirect("/dashboard")
+  if (!profile || !allowedRoles.includes(profile.role)) {
+    throw new Error("Insufficient permissions")
   }
 
   return profile

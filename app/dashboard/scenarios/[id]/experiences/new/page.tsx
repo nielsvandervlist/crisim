@@ -14,7 +14,11 @@ interface NewExperiencePageProps {
 
 export default async function NewExperiencePage({ params }: NewExperiencePageProps) {
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Verify scenario exists and user has access
   const { data: scenario, error } = await supabase

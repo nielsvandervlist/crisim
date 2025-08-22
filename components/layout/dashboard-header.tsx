@@ -12,7 +12,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { LogOut, User } from "lucide-react"
 import { signOut } from "@/lib/actions"
-import { DashboardNav } from "./dashboard-nav"
 
 interface DashboardHeaderProps {
   user: {
@@ -36,8 +35,7 @@ export function DashboardHeader({ user, organizationName }: DashboardHeaderProps
     <header className="bg-white border-b px-4 py-3 md:pl-64">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <DashboardNav userRole={user.role} organizationName={organizationName} />
-          <h1 className="ml-4 text-xl font-semibold text-gray-900 md:ml-0">Crisis Training Dashboard</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Crisis Training Dashboard</h1>
         </div>
 
         <DropdownMenu>

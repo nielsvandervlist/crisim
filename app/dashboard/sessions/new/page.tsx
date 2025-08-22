@@ -10,7 +10,11 @@ interface NewSessionPageProps {
 
 export default async function NewSessionPage({ searchParams }: NewSessionPageProps) {
   const profile = await requireRole(["admin", "trainer"])
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  if (!supabase) {
+    throw new Error("Supabase client not available")
+  }
 
   // Get scenarios and members
   const [scenariosResult, membersResult] = await Promise.all([
@@ -18,7 +22,6 @@ export default async function NewSessionPage({ searchParams }: NewSessionPagePro
       .from("scenarios")
       .select("id, title, crisis_type, difficulty_level, estimated_duration")
       .eq("organization_id", profile.organization_id)
-      .eq("is_active", true)
       .order("title"),
     supabase
       .from("profiles")
