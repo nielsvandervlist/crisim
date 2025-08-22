@@ -14,12 +14,37 @@ export default async function MembersPage() {
     throw new Error("Supabase client not available")
   }
 
+  // Debug logging
+  console.log("🔍 Members page - Profile data:", {
+    id: profile.id,
+    email: profile.email,
+    role: profile.role,
+    organization_id: profile.organization_id
+  })
+
   // Get organization members
-  const { data: members } = await supabase
+  const { data: members, error: membersError } = await supabase
     .from("profiles")
     .select("*")
     .eq("organization_id", profile.organization_id)
     .order("created_at", { ascending: false })
+
+  // Debug logging
+  if (membersError) {
+    console.error("❌ Error fetching members:", membersError.message)
+  } else {
+    console.log(`✅ Found ${members?.length || 0} members for organization ${profile.organization_id}`)
+    if (members && members.length > 0) {
+      members.forEach((member, index) => {
+        console.log(`   Member ${index + 1}:`, {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+          role: member.role
+        })
+      })
+    }
+  }
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {

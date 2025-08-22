@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Save, Users } from "lucide-react"
-import { createTrainingSession } from "@/lib/actions"
+import { createTrainingSession, updateTrainingSession } from "@/lib/actions"
 import { useState } from "react"
 
 interface SessionFormProps {
@@ -26,33 +26,66 @@ interface SessionFormProps {
     role: string
   }>
   initialScenarioId?: string
+  initialTitle?: string
+  initialStartTime?: string
+  initialParticipants?: Array<{
+    participant_id: string
+    role_assignment: string
+    status: string
+    profiles?: {
+      id: string
+      full_name: string
+      email: string
+    }
+  }>
+  isEditing?: boolean
+  sessionId?: string
 }
 
-function SubmitButton() {
+function SubmitButton({ disabled, isEditing }: { disabled?: boolean; isEditing?: boolean }) {
   const { pending } = useFormStatus()
 
   return (
-    <Button type="submit" disabled={pending} className="bg-green-600 hover:bg-green-700">
+    <Button type="submit" disabled={pending || disabled} className="bg-green-600 hover:bg-green-700">
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Creating session...
+          {isEditing ? "Updating session..." : "Creating session..."}
         </>
       ) : (
         <>
           <Save className="mr-2 h-4 w-4" />
-          Create Training Session
+          {isEditing ? "Update Training Session" : "Create Training Session"}
         </>
       )}
     </Button>
   )
 }
 
-export function SessionForm({ scenarios, members, initialScenarioId }: SessionFormProps) {
-  const [state, formAction] = useActionState(createTrainingSession, null)
+export function SessionForm({ 
+  scenarios, 
+  members, 
+  initialScenarioId, 
+  initialTitle, 
+  initialStartTime, 
+  initialParticipants, 
+  isEditing = false,
+  sessionId 
+}: SessionFormProps) {
+  const [state, formAction] = useActionState(
+    isEditing ? updateTrainingSession : createTrainingSession, 
+    null
+  )
   const [selectedScenario, setSelectedScenario] = useState(initialScenarioId || "")
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([])
-  const [participantRoles, setParticipantRoles] = useState<Record<string, string>>({})
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+    initialParticipants?.map(p => p.participant_id) || []
+  )
+  const [participantRoles, setParticipantRoles] = useState<Record<string, string>>(
+    initialParticipants?.reduce((acc, p) => ({
+      ...acc,
+      [p.participant_id]: p.role_assignment
+    }), {}) || {}
+  )
 
   const handleParticipantToggle = (participantId: string, checked: boolean) => {
     if (checked) {
@@ -79,8 +112,10 @@ export function SessionForm({ scenarios, members, initialScenarioId }: SessionFo
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Training Session</CardTitle>
-          <CardDescription>Set up a new crisis training session for your team</CardDescription>
+          <CardTitle>{isEditing ? "Edit Training Session" : "Create Training Session"}</CardTitle>
+          <CardDescription>
+            {isEditing ? "Update the crisis training session details" : "Set up a new crisis training session for your team"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-6">
@@ -102,6 +137,7 @@ export function SessionForm({ scenarios, members, initialScenarioId }: SessionFo
                   placeholder="e.g., Q1 Crisis Response Training"
                   required
                   className="w-full"
+                  defaultValue={initialTitle}
                 />
               </div>
 
@@ -109,7 +145,7 @@ export function SessionForm({ scenarios, members, initialScenarioId }: SessionFo
                 <label htmlFor="scenarioId" className="block text-sm font-medium text-gray-700 mb-2">
                   Training Scenario *
                 </label>
-                <Select name="scenarioId" value={selectedScenario} onValueChange={setSelectedScenario} required>
+                <Select value={selectedScenario} onValueChange={setSelectedScenario} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a scenario" />
                   </SelectTrigger>
@@ -121,13 +157,23 @@ export function SessionForm({ scenarios, members, initialScenarioId }: SessionFo
                     ))}
                   </SelectContent>
                 </Select>
+                <input type="hidden" name="scenarioId" value={selectedScenario} />
+                {!selectedScenario && (
+                  <p className="text-sm text-red-600 mt-1">Please select a training scenario</p>
+                )}
               </div>
 
               <div>
                 <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-2">
                   Start Time (Optional)
                 </label>
-                <Input id="startTime" name="startTime" type="datetime-local" className="w-full" />
+                <Input 
+                  id="startTime" 
+                  name="startTime" 
+                  type="datetime-local" 
+                  className="w-full" 
+                  defaultValue={initialStartTime ? initialStartTime.slice(0, 16) : undefined}
+                />
               </div>
             </div>
 
@@ -148,11 +194,14 @@ export function SessionForm({ scenarios, members, initialScenarioId }: SessionFo
               </div>
             )}
 
-            {/* Hidden input for selected participants */}
+            {/* Hidden inputs */}
+            {isEditing && sessionId && (
+              <input type="hidden" name="sessionId" value={sessionId} />
+            )}
             <input type="hidden" name="participants" value={JSON.stringify(selectedParticipants)} />
             <input type="hidden" name="participantRoles" value={JSON.stringify(participantRoles)} />
 
-            <SubmitButton />
+            <SubmitButton disabled={!selectedScenario} isEditing={isEditing} />
           </form>
         </CardContent>
       </Card>

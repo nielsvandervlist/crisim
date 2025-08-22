@@ -40,3 +40,29 @@ export const createClient = cache(async () => {
     }
   )
 })
+
+// Create a service role client for admin operations
+export const createServiceClient = () => {
+  if (!isSupabaseConfigured) {
+    throw new Error("Supabase environment variables are not configured")
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured")
+  }
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      cookies: {
+        getAll() {
+          return []
+        },
+        setAll() {
+          // Service role client doesn't need to set cookies
+        },
+      },
+    }
+  )
+}

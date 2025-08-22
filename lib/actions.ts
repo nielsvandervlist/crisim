@@ -1,8 +1,9 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import { emailService } from "@/lib/email-service"
 
 export async function signIn(prevState: any, formData: FormData) {
   if (!formData) {
@@ -119,6 +120,18 @@ export async function signUp(prevState: any, formData: FormData) {
     if (profileError) {
       console.error("Profile creation error:", profileError)
       return { error: "Failed to create user profile" }
+    }
+
+    // Send welcome email
+    try {
+      const emailResult = await emailService.sendWelcomeEmail(user.id)
+      if (!emailResult.success) {
+        console.error("Failed to send welcome email:", emailResult.error)
+        // Don't fail signup if email fails, just log it
+      }
+    } catch (emailError) {
+      console.error("Error sending welcome email:", emailError)
+      // Continue with success even if email fails
     }
 
     return { success: "Account created successfully! Please check your email to verify your account." }
@@ -266,6 +279,8 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
   const title = formData.get("title")
   const scenarioId = formData.get("scenarioId")
   const startTime = formData.get("startTime")
+  const participants = formData.get("participants")
+  const participantRoles = formData.get("participantRoles")
 
   if (!title || !scenarioId) {
     return { error: "Title and scenario are required" }
@@ -277,59 +292,219 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
     return { error: "Supabase is not configured" }
   }
 
-  try {
-    // Get current user and their organization
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { error: "You must be logged in" }
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("organization_id, role")
-      .eq("user_id", user.id)
-      .single()
-
-    if (!profile || !["admin", "trainer"].includes(profile.role)) {
-      return { error: "You don't have permission to create training sessions" }
-    }
-
-    // Verify scenario belongs to organization
-    const { data: scenario } = await supabase
-      .from("scenarios")
-      .select("id")
-      .eq("id", scenarioId.toString())
-      .eq("organization_id", profile.organization_id)
-      .single()
-
-    if (!scenario) {
-      return { error: "Scenario not found" }
-    }
-
-    // Create training session
-    const { data: session, error: sessionError } = await supabase
-      .from("training_sessions")
-      .insert({
-        organization_id: profile.organization_id,
-        scenario_id: scenarioId.toString(),
-        title: title.toString(),
-        start_time: startTime ? new Date(startTime.toString()).toISOString() : null,
-        created_by: user.id,
-        status: "draft",
-      })
-      .select()
-      .single()
-
-    if (sessionError) {
-      return { error: "Failed to create training session" }
-    }
-
-    revalidatePath("/dashboard/sessions")
-    redirect(`/dashboard/sessions/${session.id}`)
-  } catch (error) {
-    console.error("Create training session error:", error)
-    return { error: "An unexpected error occurred" }
+  // Get current user and their organization
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "You must be logged in" }
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id, role")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!profile || !["admin", "trainer"].includes(profile.role)) {
+    return { error: "You don't have permission to create training sessions" }
+  }
+
+  // Verify scenario belongs to organization
+  const { data: scenario } = await supabase
+    .from("scenarios")
+    .select("id")
+    .eq("id", scenarioId.toString())
+    .eq("organization_id", profile.organization_id)
+    .single()
+
+  if (!scenario) {
+    return { error: "Scenario not found" }
+  }
+
+  // Create training session
+  const { data: session, error: sessionError } = await supabase
+    .from("training_sessions")
+    .insert({
+      organization_id: profile.organization_id,
+      scenario_id: scenarioId.toString(),
+      title: title.toString(),
+      start_time: startTime ? new Date(startTime.toString()).toISOString() : null,
+      created_by: user.id,
+      status: "draft",
+    })
+    .select()
+    .single()
+
+  if (sessionError) {
+    console.error("Session creation error:", sessionError)
+    return { error: "Failed to create training session" }
+  }
+
+  // Add participants if any were selected
+  console.log("Raw form data:", { participants, participantRoles })
+  
+  if (participants && participantRoles) {
+    try {
+      const participantsList = JSON.parse(participants.toString())
+      const rolesMap = JSON.parse(participantRoles.toString())
+      
+      console.log("Parsed participants data:", { participantsList, rolesMap })
+      
+      if (participantsList.length > 0) {
+        const participantRecords = participantsList.map((participantId: string) => ({
+          session_id: session.id,
+          participant_id: participantId,
+          role_assignment: rolesMap[participantId] || "Observer",
+          status: "invited",
+        }))
+
+        console.log("Participant records to insert:", participantRecords)
+
+        const { error: participantsError } = await supabase
+          .from("session_participants")
+          .insert(participantRecords)
+
+        if (participantsError) {
+          console.error("Failed to add participants:", participantsError)
+          // Don't fail the entire operation if adding participants fails
+        } else {
+          console.log("Participants added successfully!")
+        }
+      } else {
+        console.log("No participants selected")
+      }
+    } catch (parseError) {
+      console.error("Failed to parse participants data:", parseError)
+      // Don't fail the entire operation if parsing fails
+    }
+  } else {
+    console.log("No participants data in form")
+  }
+
+  revalidatePath("/dashboard/sessions")
+  redirect(`/dashboard/sessions/${session.id}`)
+}
+
+export async function updateTrainingSession(prevState: any, formData: FormData) {
+  const sessionId = formData.get("sessionId")
+  const title = formData.get("title")
+  const scenarioId = formData.get("scenarioId")
+  const startTime = formData.get("startTime")
+  const participants = formData.get("participants")
+  const participantRoles = formData.get("participantRoles")
+
+  if (!sessionId || !title || !scenarioId) {
+    return { error: "Session ID, title and scenario are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  // Get current user and their organization
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "You must be logged in" }
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id, role")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!profile || !["admin", "trainer"].includes(profile.role)) {
+    return { error: "You don't have permission to update training sessions" }
+  }
+
+  // Verify session belongs to organization and user has access
+  const { data: existingSession, error: sessionCheckError } = await supabase
+    .from("training_sessions")
+    .select("id, created_by")
+    .eq("id", sessionId.toString())
+    .eq("organization_id", profile.organization_id)
+    .single()
+
+  if (sessionCheckError || !existingSession) {
+    return { error: "Session not found or access denied" }
+  }
+
+  // Only allow creator or admin to edit
+  if (existingSession.created_by !== user.id && profile.role !== "admin") {
+    return { error: "You don't have permission to edit this session" }
+  }
+
+  // Verify scenario belongs to organization
+  const { data: scenario } = await supabase
+    .from("scenarios")
+    .select("id")
+    .eq("id", scenarioId.toString())
+    .eq("organization_id", profile.organization_id)
+    .single()
+
+  if (!scenario) {
+    return { error: "Scenario not found" }
+  }
+
+  // Update training session
+  const { error: updateError } = await supabase
+    .from("training_sessions")
+    .update({
+      scenario_id: scenarioId.toString(),
+      title: title.toString(),
+      start_time: startTime ? new Date(startTime.toString()).toISOString() : null,
+    })
+    .eq("id", sessionId.toString())
+
+  if (updateError) {
+    console.error("Session update error:", updateError)
+    return { error: "Failed to update training session" }
+  }
+
+  // Update participants if any were selected
+  if (participants && participantRoles) {
+    try {
+      // First, remove all existing participants
+      const { error: deleteError } = await supabase
+        .from("session_participants")
+        .delete()
+        .eq("session_id", sessionId.toString())
+
+      if (deleteError) {
+        console.error("Failed to remove existing participants:", deleteError)
+      }
+
+      // Then add the new participants
+      const participantsList = JSON.parse(participants.toString())
+      const rolesMap = JSON.parse(participantRoles.toString())
+      
+      if (participantsList.length > 0) {
+        const participantRecords = participantsList.map((participantId: string) => ({
+          session_id: sessionId.toString(),
+          participant_id: participantId,
+          role_assignment: rolesMap[participantId] || "Observer",
+          status: "invited",
+        }))
+
+        const { error: participantsError } = await supabase
+          .from("session_participants")
+          .insert(participantRecords)
+
+        if (participantsError) {
+          console.error("Failed to add participants:", participantsError)
+          // Don't fail the entire operation if adding participants fails
+        }
+      }
+    } catch (parseError) {
+      console.error("Failed to parse participants data:", parseError)
+      // Don't fail the entire operation if parsing fails
+    }
+  }
+
+  revalidatePath("/dashboard/sessions")
+  revalidatePath(`/dashboard/sessions/${sessionId}`)
+  redirect(`/dashboard/sessions/${sessionId}`)
 }
 
 export async function inviteParticipant(prevState: any, formData: FormData) {
@@ -399,6 +574,18 @@ export async function inviteParticipant(prevState: any, formData: FormData) {
 
     if (inviteError) {
       return { error: "Failed to invite participant" }
+    }
+
+    // Send invitation email
+    try {
+      const emailResult = await emailService.sendSessionInvitations(sessionId.toString())
+      if (!emailResult.success) {
+        console.error("Failed to send invitation email:", emailResult.error)
+        // Don't fail the entire operation if email fails, just log it
+      }
+    } catch (emailError) {
+      console.error("Error sending invitation email:", emailError)
+      // Continue with success even if email fails
     }
 
     revalidatePath(`/dashboard/sessions/${sessionId}`)
@@ -563,7 +750,7 @@ export async function inviteMember(prevState: any, formData: FormData) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("organization_id, role")
+      .select("organization_id, role, full_name")
       .eq("user_id", user.id)
       .single()
 
@@ -582,29 +769,201 @@ export async function inviteMember(prevState: any, formData: FormData) {
       return { error: "User with this email already exists" }
     }
 
-    // For now, we'll just create a placeholder profile
-    // In a real implementation, you might want to send an email invitation
-    // and create the profile when they accept
+    // Clean up expired invitations for this email in this organization
+    await supabase
+      .from("member_invitations")
+      .update({ status: "expired" })
+      .eq("email", email.toString())
+      .eq("organization_id", profile.organization_id)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString())
+
+    // Check if there's already a valid pending invitation for this email
+    const { data: existingInvitation } = await supabase
+      .from("member_invitations")
+      .select("id, expires_at")
+      .eq("email", email.toString())
+      .eq("organization_id", profile.organization_id)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString()) // Only consider non-expired invitations
+      .single()
+
+    if (existingInvitation) {
+      return { error: "An active invitation has already been sent to this email address" }
+    }
+
+    // Get organization details for the email
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", profile.organization_id)
+      .single()
+
+    if (!organization) {
+      return { error: "Organization not found" }
+    }
+
+    // Generate invitation token
+    const { data: tokenData, error: tokenError } = await supabase
+      .rpc('generate_invitation_token')
+
+    if (tokenError || !tokenData) {
+      console.error("Token generation error:", tokenError)
+      return { error: "Failed to generate invitation token" }
+    }
+
+    // Create invitation record
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 7) // 7 days from now
+
     const { error: inviteError } = await supabase
-      .from("profiles")
+      .from("member_invitations")
       .insert({
         email: email.toString(),
-        role: role.toString(),
         organization_id: profile.organization_id,
-        full_name: null, // Will be set when user completes signup
-        user_id: null, // Will be set when user creates account
+        role: role.toString(),
+        invited_by: user.id,
+        invitation_token: tokenData,
+        expires_at: expiresAt.toISOString(),
       })
 
     if (inviteError) {
       console.error("Invite member error:", inviteError)
-      return { error: "Failed to invite member" }
+      return { error: "Failed to create invitation" }
+    }
+
+    // Send invitation email
+    try {
+      const emailResult = await emailService.sendMemberInvitation(
+        profile.full_name || "Admin",
+        organization.name,
+        role.toString(),
+        email.toString(),
+        tokenData
+      )
+      
+      if (!emailResult.success) {
+        console.error("Failed to send invitation email:", emailResult.error)
+        // Don't fail the entire operation if email fails, just log it
+        return { success: "Invitation created but email delivery failed. Please try again." }
+      }
+    } catch (emailError) {
+      console.error("Error sending invitation email:", emailError)
+      return { success: "Invitation created but email delivery failed. Please try again." }
     }
 
     revalidatePath("/dashboard/members")
     revalidatePath("/dashboard/organization")
-    return { success: "Member invited successfully!" }
+    return { success: "Invitation sent successfully! The user will receive an email to join your organization." }
   } catch (error) {
     console.error("Invite member error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function acceptInvitation(prevState: any, formData: FormData) {
+  const token = formData.get("token")
+  const fullName = formData.get("fullName")
+  const password = formData.get("password")
+
+  if (!token || !fullName || !password) {
+    return { error: "All fields are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Create service client for admin operations
+    const serviceClient = createServiceClient()
+    
+    // Get invitation details
+    const { data: invitation, error: inviteError } = await supabase
+      .from("member_invitations")
+      .select(`
+        *,
+        organization:organizations(name)
+      `)
+      .eq("invitation_token", token.toString())
+      .eq("status", "pending")
+      .single()
+
+    if (inviteError || !invitation) {
+      return { error: "Invalid or expired invitation" }
+    }
+
+    // Check if invitation has expired
+    if (new Date(invitation.expires_at) < new Date()) {
+      return { error: "This invitation has expired" }
+    }
+
+    // Create the user account using service client to bypass email verification
+    const { data: { user }, error: signUpError } = await serviceClient.auth.admin.createUser({
+      email: invitation.email,
+      password: password.toString(),
+      email_confirm: true, // Automatically confirm email for invited users
+      user_metadata: {
+        full_name: fullName.toString(),
+      }
+    })
+
+    if (signUpError) {
+      return { error: signUpError.message }
+    }
+
+    if (!user) {
+      return { error: "Failed to create user account" }
+    }
+
+    // Create user profile using service client to bypass RLS
+    const { error: profileError } = await serviceClient
+      .from("profiles")
+      .insert({
+        user_id: user.id,
+        email: invitation.email,
+        full_name: fullName.toString(),
+        role: invitation.role,
+        organization_id: invitation.organization_id,
+        email_verified: true, // Since they came through invitation
+      })
+
+    if (profileError) {
+      console.error("Profile creation error:", profileError)
+      return { error: "Failed to create user profile" }
+    }
+
+    // Mark invitation as accepted using service client
+    const { error: updateError } = await serviceClient
+      .from("member_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+      })
+      .eq("invitation_token", token.toString())
+
+    if (updateError) {
+      console.error("Failed to update invitation status:", updateError)
+      // Don't fail the entire operation if this fails
+    }
+
+    // Send welcome email
+    try {
+      const emailResult = await emailService.sendWelcomeEmail(user.id)
+      if (!emailResult.success) {
+        console.error("Failed to send welcome email:", emailResult.error)
+        // Don't fail signup if email fails, just log it
+      }
+    } catch (emailError) {
+      console.error("Error sending welcome email:", emailError)
+      // Continue with success even if email fails
+    }
+
+    return { success: "Account created successfully! You can now log in to access your organization." }
+  } catch (error) {
+    console.error("Accept invitation error:", error)
     return { error: "An unexpected error occurred" }
   }
 }

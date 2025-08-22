@@ -3,14 +3,15 @@ import { createClient } from "@/lib/supabase/server"
 import { SessionForm } from "@/components/sessions/session-form"
 
 interface NewSessionPageProps {
-  searchParams: {
+  searchParams: Promise<{
     scenario?: string
-  }
+  }>
 }
 
 export default async function NewSessionPage({ searchParams }: NewSessionPageProps) {
   const profile = await requireRole(["admin", "trainer"])
   const supabase = await createClient()
+  const resolvedSearchParams = await searchParams
 
   if (!supabase) {
     throw new Error("Supabase client not available")
@@ -40,7 +41,7 @@ export default async function NewSessionPage({ searchParams }: NewSessionPagePro
         <p className="text-gray-600 mt-2">Set up a new crisis training session for your team</p>
       </div>
 
-      <SessionForm scenarios={scenarios} members={members} initialScenarioId={searchParams.scenario} />
+      <SessionForm scenarios={scenarios} members={members} initialScenarioId={resolvedSearchParams.scenario} />
     </div>
   )
 }

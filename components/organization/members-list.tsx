@@ -23,6 +23,13 @@ export async function MembersList({ organizationId }: MembersListProps) {
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
 
+  const { data: pendingInvitations } = await supabase
+    .from("member_invitations")
+    .select("id, email, role, created_at, expires_at")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "admin":
@@ -53,47 +60,104 @@ export async function MembersList({ organizationId }: MembersListProps) {
         <CardTitle className="flex items-center">
           <Users className="mr-2 h-5 w-5" />
           Team Members ({members?.length || 0})
+          {pendingInvitations && pendingInvitations.length > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {pendingInvitations.length} pending
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {members?.map((member) => (
-            <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center space-x-4">
-                <Avatar>
-                  <AvatarFallback className="bg-blue-100 text-blue-600">
-                    {getInitials(member.full_name, member.email)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <p className="font-medium text-gray-900">{member.full_name || "No name set"}</p>
-                    <Badge className={getRoleBadgeColor(member.role)}>{member.role}</Badge>
+          {/* Pending Invitations */}
+          {pendingInvitations && pendingInvitations.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-gray-700">Pending Invitations</h3>
+              {pendingInvitations.map((invitation) => (
+                <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg bg-yellow-50 border-yellow-200">
+                  <div className="flex items-center space-x-4">
+                    <Avatar>
+                      <AvatarFallback className="bg-yellow-100 text-yellow-600">
+                        <Mail className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-gray-900">{invitation.email}</p>
+                        <Badge className={getRoleBadgeColor(invitation.role)}>{invitation.role}</Badge>
+                        <Badge variant="outline" className="text-yellow-700 border-yellow-300">
+                          Pending
+                        </Badge>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Mail className="mr-1 h-3 w-3" />
+                        Invitation sent {new Date(invitation.created_at).toLocaleDateString()}
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Mail className="mr-1 h-3 w-3" />
-                    {member.email}
-                  </div>
-                  <p className="text-xs text-gray-400">Joined {new Date(member.created_at).toLocaleDateString()}</p>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>Resend Invitation</DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600">Cancel Invitation</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                  <DropdownMenuItem>Send Message</DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-600">Remove Member</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              ))}
             </div>
-          ))}
+          )}
 
-          {!members?.length && (
+          {/* Active Members */}
+          {members && members.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-gray-700">Active Members</h3>
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <Avatar>
+                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                        {getInitials(member.full_name, member.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-gray-900">{member.full_name || "No name set"}</p>
+                        <Badge className={getRoleBadgeColor(member.role)}>{member.role}</Badge>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Mail className="mr-1 h-3 w-3" />
+                        {member.email}
+                      </div>
+                      <p className="text-xs text-gray-400">Joined {new Date(member.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>Edit Role</DropdownMenuItem>
+                      <DropdownMenuItem>Send Message</DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600">Remove Member</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!members?.length && !pendingInvitations?.length && (
             <div className="text-center py-8 text-gray-500">
               <Users className="mx-auto h-12 w-12 text-gray-300" />
               <p className="mt-2">No team members yet</p>
