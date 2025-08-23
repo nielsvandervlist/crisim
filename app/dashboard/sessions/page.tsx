@@ -21,17 +21,20 @@ export default async function SessionsPage() {
       *,
       scenario:scenarios(title, crisis_type, difficulty_level, estimated_duration),
       creator:profiles!training_sessions_created_by_fkey(full_name),
-      session_participants(id, participant_id, role_assignment)
+      session_participants!session_participants_session_id_fkey(id, participant_id, role_assignment)
     `)
     .eq("organization_id", profile.organization_id)
     .order("created_at", { ascending: false })
 
   // If participant, only show sessions they're assigned to
   if (profile.role === "participant") {
-    sessionsQuery = sessionsQuery.in(
-      "id",
-      supabase.from("session_participants").select("session_id").eq("participant_id", profile.id),
-    )
+    const { data: participantSessions } = await supabase
+      .from("session_participants")
+      .select("session_id")
+      .eq("participant_id", profile.user_id)
+    
+    const sessionIds = participantSessions?.map(p => p.session_id) || []
+    sessionsQuery = sessionsQuery.in("id", sessionIds)
   }
 
   const { data: sessions } = await sessionsQuery
@@ -77,9 +80,9 @@ export default async function SessionsPage() {
       {sessions && sessions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sessions.map((session) => {
-            const isParticipant = session.session_participants?.some((p: any) => p.participant_id === profile.id)
+            const isParticipant = session.session_participants?.some((p: any) => p.participant_id === profile.user_id)
             const participantRole = session.session_participants?.find(
-              (p: any) => p.participant_id === profile.id,
+              (p: any) => p.participant_id === profile.user_id,
             )?.role_assignment
 
             return (
