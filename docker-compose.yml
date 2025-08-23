@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: crisim-mailhog
+    ports:
+      - "1026:1025"  # SMTP port
+      - "8026:8025"  # Web UI port
+    environment:
+      MH_STORAGE: memory
+      MH_HOSTNAME: mailhog
+    restart: unless-stopped
+    networks:
+      - crisim-network
+
+networks:
+  crisim-network:
+    driver: bridge
