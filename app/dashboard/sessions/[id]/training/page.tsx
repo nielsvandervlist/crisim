@@ -6,12 +6,13 @@ import { notFound } from "next/navigation"
 import { TrainingInterface } from "@/components/training/training-interface"
 
 interface TrainingPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function TrainingPage({ params }: TrainingPageProps) {
+  const { id } = await params
   const profile = await getServerUserProfile()
   const supabase = await createClient()
 
@@ -35,7 +36,7 @@ export default async function TrainingPage({ params }: TrainingPageProps) {
         digital_experiences(*)
       )
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("organization_id", profile.organization_id)
     .single()
 

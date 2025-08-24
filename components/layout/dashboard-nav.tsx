@@ -7,7 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Shield, Users, Target, BarChart3, Settings, Menu, Home, Play } from "lucide-react"
+import { Shield, Users, Target, BarChart3, Settings, Menu, Home, Play, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface NavItem {
@@ -28,6 +28,12 @@ const navItems: NavItem[] = [
     title: "Scenarios",
     href: "/dashboard/scenarios",
     icon: Target,
+    roles: ["admin", "trainer"],
+  },
+  {
+    title: "Digital Experiences",
+    href: "/dashboard/digital-experiences",
+    icon: Zap,
     roles: ["admin", "trainer"],
   },
   {

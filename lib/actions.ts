@@ -1078,3 +1078,138 @@ export async function createDigitalExperience(prevState: any, formData: FormData
     return { error: "An unexpected error occurred" }
   }
 }
+
+export async function createStandaloneDigitalExperience(prevState: any, formData: FormData) {
+  const typeName = formData.get("typeId") // This is actually the type name, not ID
+  const title = formData.get("title")
+  const content = formData.get("content")
+  const platform = formData.get("platform")
+  const authorName = formData.get("authorName")
+  const urgencyLevel = formData.get("urgencyLevel")
+
+  if (!typeName || !content) {
+    return { error: "Type and content are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || !["admin", "trainer"].includes(profile.role)) {
+      return { error: "You don't have permission to create digital experiences" }
+    }
+
+    // Get the type_id from the type name
+    const { data: typeData, error: typeError } = await supabase
+      .from("digital_experience_types")
+      .select("id")
+      .eq("name", typeName.toString())
+      .single()
+
+    if (typeError || !typeData) {
+      return { error: "Invalid experience type" }
+    }
+
+    // Create digital experience without a specific scenario
+    // This will be a template that can be used across multiple scenarios
+    const { error } = await supabase
+      .from("digital_experiences")
+      .insert({
+        scenario_id: null, // Explicitly set to null for standalone experiences
+        type_id: typeData.id,
+        title: title?.toString() || null,
+        content: content.toString(),
+        trigger_time: 0, // Default trigger time, will be overridden when used in scenarios
+        metadata: {
+          platform: platform?.toString() || null,
+          author_name: authorName?.toString() || null,
+          urgency_level: urgencyLevel?.toString() || null,
+        },
+        created_by: user.id,
+      })
+
+    if (error) {
+      return { error: "Failed to create digital experience" }
+    }
+
+    revalidatePath("/dashboard/digital-experiences")
+    return { success: "Digital experience created successfully!" }
+  } catch (error) {
+    console.error("Create standalone digital experience error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function updateOrganization(prevState: any, formData: FormData) {
+  const organizationId = formData.get("organizationId")
+  const name = formData.get("name")
+  const slug = formData.get("slug")
+
+  if (!organizationId || !name || !slug) {
+    return { error: "All fields are required" }
+  }
+
+  const supabase = await createClient()
+  
+  if (!supabase) {
+    return { error: "Supabase is not configured" }
+  }
+
+  try {
+    // Get current user and verify permissions
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "You must be logged in" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!profile || profile.role !== "admin") {
+      return { error: "You don't have permission to update organization settings" }
+    }
+
+    // Verify user belongs to the organization they're trying to update
+    if (profile.organization_id !== organizationId.toString()) {
+      return { error: "You can only update your own organization" }
+    }
+
+    // Update organization
+    const { error } = await supabase
+      .from("organizations")
+      .update({
+        name: name.toString(),
+        slug: slug.toString().toLowerCase().replace(/\s+/g, "-"),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", organizationId.toString())
+
+    if (error) {
+      return { error: "Failed to update organization" }
+    }
+
+    revalidatePath("/dashboard/organization")
+    return { success: "Organization updated successfully!" }
+  } catch (error) {
+    console.error("Update organization error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
