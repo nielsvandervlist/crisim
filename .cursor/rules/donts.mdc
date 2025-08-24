@@ -1,0 +1,5 @@
+---
+description: Dont run any npm run dev commands or anything that starts a local server
+globs:
+alwaysApply: false
+---

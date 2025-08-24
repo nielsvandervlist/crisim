@@ -1,0 +1,5 @@
+---
+description: This project run supabase and has a local connection with docker on port 54322
+globs:
+alwaysApply: false
+---
