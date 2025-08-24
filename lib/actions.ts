@@ -341,6 +341,7 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
 
   // Add participants if any were selected
   console.log("Raw form data:", { participants, participantRoles })
+  console.log("Participants type:", typeof participants, "Roles type:", typeof participantRoles)
   
   if (participants && participantRoles) {
     try {
@@ -348,6 +349,7 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
       const rolesMap = JSON.parse(participantRoles.toString())
       
       console.log("Parsed participants data:", { participantsList, rolesMap })
+      console.log("Participants list length:", participantsList.length)
       
       if (participantsList.length > 0) {
         const participantRecords = participantsList.map((participantId: string) => ({
@@ -374,14 +376,17 @@ export async function createTrainingSession(prevState: any, formData: FormData) 
       }
     } catch (parseError) {
       console.error("Failed to parse participants data:", parseError)
+      console.error("Parse error details:", parseError)
       // Don't fail the entire operation if parsing fails
     }
   } else {
     console.log("No participants data in form")
+    console.log("Participants value:", participants)
+    console.log("Roles value:", participantRoles)
   }
 
   revalidatePath("/dashboard/sessions")
-  redirect(`/dashboard/sessions/${session.id}`)
+  return { success: true, sessionId: session.id }
 }
 
 export async function updateTrainingSession(prevState: any, formData: FormData) {
@@ -463,6 +468,9 @@ export async function updateTrainingSession(prevState: any, formData: FormData) 
   }
 
   // Update participants if any were selected
+  console.log("Update - Raw form data:", { participants, participantRoles })
+  console.log("Update - Participants type:", typeof participants, "Roles type:", typeof participantRoles)
+  
   if (participants && participantRoles) {
     try {
       // First, remove all existing participants
@@ -479,6 +487,9 @@ export async function updateTrainingSession(prevState: any, formData: FormData) 
       const participantsList = JSON.parse(participants.toString())
       const rolesMap = JSON.parse(participantRoles.toString())
       
+      console.log("Update - Parsed participants data:", { participantsList, rolesMap })
+      console.log("Update - Participants list length:", participantsList.length)
+      
       if (participantsList.length > 0) {
         const participantRecords = participantsList.map((participantId: string) => ({
           session_id: sessionId.toString(),
@@ -487,6 +498,8 @@ export async function updateTrainingSession(prevState: any, formData: FormData) 
           status: "invited",
         }))
 
+        console.log("Update - Participant records to insert:", participantRecords)
+
         const { error: participantsError } = await supabase
           .from("session_participants")
           .insert(participantRecords)
@@ -494,17 +507,26 @@ export async function updateTrainingSession(prevState: any, formData: FormData) 
         if (participantsError) {
           console.error("Failed to add participants:", participantsError)
           // Don't fail the entire operation if adding participants fails
+        } else {
+          console.log("Update - Participants updated successfully!")
         }
+      } else {
+        console.log("Update - No participants selected")
       }
     } catch (parseError) {
       console.error("Failed to parse participants data:", parseError)
+      console.error("Update - Parse error details:", parseError)
       // Don't fail the entire operation if parsing fails
     }
+  } else {
+    console.log("Update - No participants data in form")
+    console.log("Update - Participants value:", participants)
+    console.log("Update - Roles value:", participantRoles)
   }
 
   revalidatePath("/dashboard/sessions")
   revalidatePath(`/dashboard/sessions/${sessionId}`)
-  redirect(`/dashboard/sessions/${sessionId}`)
+  return { success: true, sessionId: sessionId.toString() }
 }
 
 export async function inviteParticipant(prevState: any, formData: FormData) {

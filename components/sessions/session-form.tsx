@@ -1,7 +1,6 @@
 "use client"
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -9,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Save, Users } from "lucide-react"
 import { createTrainingSession, updateTrainingSession } from "@/lib/actions"
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 
 interface SessionFormProps {
   scenarios: Array<{
@@ -20,7 +20,7 @@ interface SessionFormProps {
     estimated_duration: number
   }>
   members: Array<{
-    id: string
+    user_id: string
     full_name: string
     email: string
     role: string
@@ -42,25 +42,7 @@ interface SessionFormProps {
   sessionId?: string
 }
 
-function SubmitButton({ disabled, isEditing }: { disabled?: boolean; isEditing?: boolean }) {
-  const { pending } = useFormStatus()
 
-  return (
-    <Button type="submit" disabled={pending || disabled} className="bg-green-600 hover:bg-green-700">
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {isEditing ? "Updating session..." : "Creating session..."}
-        </>
-      ) : (
-        <>
-          <Save className="mr-2 h-4 w-4" />
-          {isEditing ? "Update Training Session" : "Create Training Session"}
-        </>
-      )}
-    </Button>
-  )
-}
 
 export function SessionForm({ 
   scenarios, 
@@ -72,10 +54,11 @@ export function SessionForm({
   isEditing = false,
   sessionId 
 }: SessionFormProps) {
-  const [state, formAction] = useActionState(
-    isEditing ? updateTrainingSession : createTrainingSession, 
-    null
-  )
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  
   const [selectedScenario, setSelectedScenario] = useState(initialScenarioId || "")
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     initialParticipants?.map(p => p.participant_id) || []
@@ -105,8 +88,56 @@ export function SessionForm({
     })
   }
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    console.log("Form submit handler called!")
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const formData = new FormData(e.currentTarget)
+      
+      // Ensure the hidden inputs are updated with current state
+      formData.set("participants", JSON.stringify(selectedParticipants))
+      formData.set("participantRoles", JSON.stringify(participantRoles))
+      
+      // Debug logging
+      console.log("Submitting form with participants:", selectedParticipants)
+      console.log("Submitting form with roles:", participantRoles)
+      console.log("Form data participants:", formData.get("participants"))
+      console.log("Form data roles:", formData.get("participantRoles"))
+      
+
+      
+      const action = isEditing ? updateTrainingSession : createTrainingSession
+      const result = await action(null, formData)
+      
+      console.log("Action result:", result)
+      
+      if (result?.error) {
+        setError(result.error)
+      } else if (result?.success) {
+        // Success - redirect to the session page
+        if (isEditing) {
+          router.push(`/dashboard/sessions/${sessionId}`)
+        } else {
+          router.push(`/dashboard/sessions/${result.sessionId}`)
+        }
+        router.refresh()
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
+      console.error("Form submission error:", err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const selectedScenarioData = scenarios.find((s) => s.id === selectedScenario)
-  const eligibleMembers = members.filter((m) => m.role === "participant")
+  // Show all members, not just participants, since admins and trainers can also participate
+  const eligibleMembers = members
+  
+
 
   return (
     <div className="space-y-6">
@@ -118,10 +149,10 @@ export function SessionForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-6">
-            {state?.error && (
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+            {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                {state.error}
+                {error}
               </div>
             )}
 
@@ -201,7 +232,26 @@ export function SessionForm({
             <input type="hidden" name="participants" value={JSON.stringify(selectedParticipants)} />
             <input type="hidden" name="participantRoles" value={JSON.stringify(participantRoles)} />
 
-            <SubmitButton disabled={!selectedScenario} isEditing={isEditing} />
+
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !selectedScenario} 
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditing ? "Updating session..." : "Creating session..."}
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditing ? "Update Training Session" : "Create Training Session"}
+                </>
+              )}
+            </Button>
+            
+
           </form>
         </CardContent>
       </Card>
@@ -214,19 +264,20 @@ export function SessionForm({
             Select Participants
           </CardTitle>
           <CardDescription>Choose team members to participate in this training session</CardDescription>
+
         </CardHeader>
         <CardContent>
           {eligibleMembers.length > 0 ? (
             <div className="space-y-4">
               {eligibleMembers.map((member) => {
-                const isSelected = selectedParticipants.includes(member.id)
+                const isSelected = selectedParticipants.includes(member.user_id)
 
                 return (
-                  <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={member.user_id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center space-x-3">
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={(checked) => handleParticipantToggle(member.id, checked as boolean)}
+                        onCheckedChange={(checked) => handleParticipantToggle(member.user_id, checked as boolean)}
                       />
                       <div>
                         <p className="font-medium text-gray-900">{member.full_name}</p>
@@ -237,8 +288,8 @@ export function SessionForm({
                     {isSelected && (
                       <div className="w-48">
                         <Select
-                          value={participantRoles[member.id] || ""}
-                          onValueChange={(role) => handleRoleChange(member.id, role)}
+                          value={participantRoles[member.user_id] || ""}
+                          onValueChange={(role) => handleRoleChange(member.user_id, role)}
                         >
                           <SelectTrigger size="sm">
                             <SelectValue placeholder="Assign role" />

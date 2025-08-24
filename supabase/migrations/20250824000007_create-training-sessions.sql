@@ -24,9 +24,13 @@ CREATE INDEX idx_training_sessions_start_time ON training_sessions(start_time);
 -- Enable RLS (Row Level Security)
 ALTER TABLE training_sessions ENABLE ROW LEVEL SECURITY;
 
--- Basic RLS policies for training_sessions table
+-- Fixed RLS policies for training_sessions table
+-- Users can always view sessions they created
+CREATE POLICY "Users can view own sessions" ON training_sessions
+    FOR SELECT USING (created_by = auth.uid());
+
 -- Organization members can view sessions in their organization
-CREATE POLICY "Organization members can view sessions" ON training_sessions
+CREATE POLICY "Organization members can view org sessions" ON training_sessions
     FOR SELECT USING (
         organization_id IN (
             SELECT organization_id FROM profiles 

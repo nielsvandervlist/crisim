@@ -14,15 +14,16 @@ export default async function SessionsPage() {
     throw new Error("Supabase client not available")
   }
 
+  console.log('Profile:', { 
+    role: profile.role, 
+    organization_id: profile.organization_id,
+    user_id: profile.user_id 
+  })
+
   // Get training sessions based on user role
   let sessionsQuery = supabase
     .from("training_sessions")
-    .select(`
-      *,
-      scenario:scenarios(title, crisis_type, difficulty_level, estimated_duration),
-      creator:profiles!training_sessions_created_by_fkey(full_name),
-      session_participants!session_participants_session_id_fkey(id, participant_id, role_assignment)
-    `)
+    .select("*")
     .eq("organization_id", profile.organization_id)
     .order("created_at", { ascending: false })
 
@@ -38,6 +39,8 @@ export default async function SessionsPage() {
   }
 
   const { data: sessions } = await sessionsQuery
+
+  console.log('Sessions:', sessions)
 
   const getStatusColor = (status: string) => {
     switch (status) {

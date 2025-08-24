@@ -59,7 +59,7 @@ export default async function EditSessionPage({ params }: EditSessionPageProps) 
       .order("title"),
     supabase
       .from("profiles")
-      .select("id, full_name, email, role")
+      .select("user_id, full_name, email, role")
       .eq("organization_id", profile.organization_id)
       .order("full_name"),
   ])
@@ -81,6 +81,14 @@ export default async function EditSessionPage({ params }: EditSessionPageProps) 
       )
     `)
     .eq("session_id", id)
+
+  // Transform participants to match expected structure
+  const transformedParticipants = participants?.map(p => ({
+    participant_id: p.participant_id,
+    role_assignment: p.role_assignment,
+    status: p.status,
+    profiles: p.profiles?.[0] // Extract first profile from array
+  })) || []
 
   return (
     <div className="space-y-6">
@@ -105,7 +113,7 @@ export default async function EditSessionPage({ params }: EditSessionPageProps) 
         initialScenarioId={session.scenario_id}
         initialTitle={session.title}
         initialStartTime={session.start_time}
-        initialParticipants={participants || []}
+        initialParticipants={transformedParticipants}
         isEditing={true}
         sessionId={id}
       />

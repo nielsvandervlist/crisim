@@ -26,13 +26,15 @@ export default async function NewSessionPage({ searchParams }: NewSessionPagePro
       .order("title"),
     supabase
       .from("profiles")
-      .select("id, full_name, email, role")
+      .select("user_id, full_name, email, role")
       .eq("organization_id", profile.organization_id)
       .order("full_name"),
   ])
 
   const scenarios = scenariosResult.data || []
   const members = membersResult.data || []
+
+
 
   return (
     <div className="space-y-6">
