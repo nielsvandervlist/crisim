@@ -61,10 +61,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
     // Check if user has access to this session
   const isAdminOrTrainer = ["admin", "trainer"].includes(profile.role)
   const isParticipant = session.session_participants?.some(
-    (p: any) => p.participant_id === profile.id
+    (p: any) => p.participant_id === profile.user_id
   ) || false
-  const isCreator = session.created_by === profile.id
+  const isCreator = session.created_by === profile.user_id
   const hasAccess = isAdminOrTrainer || isParticipant || isCreator
+
+  console.log(isParticipant)
 
   if (!hasAccess) {
     notFound()

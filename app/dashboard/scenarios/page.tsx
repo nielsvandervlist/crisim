@@ -30,9 +30,43 @@ export default async function ScenariosPage() {
   console.log("Scenarios found:", scenarios?.length || 0)
   console.log("Scenarios data:", scenarios)
   console.log("Error:", error)
+  console.log("Error type:", typeof error)
+  console.log("Error keys:", error ? Object.keys(error) : 'No error object')
 
   if (error) {
     console.error("Error fetching scenarios:", error)
+    // Log more details about the error
+    if (typeof error === 'object' && error !== null) {
+      console.error("Error details:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+    }
+  }
+
+  // If there's an error, you might want to show a user-friendly message
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Crisis Scenarios</h1>
+            <p className="text-gray-600 mt-2">Create and manage crisis training scenarios for your team</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="text-red-600">
+              <h3 className="mt-4 text-lg font-medium">Error loading scenarios</h3>
+              <p className="mt-2 text-sm">There was an issue loading your scenarios. Please try refreshing the page.</p>
+              <p className="mt-1 text-xs text-gray-500">Error: {error.message || 'Unknown error'}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const getDifficultyColor = (difficulty: string) => {

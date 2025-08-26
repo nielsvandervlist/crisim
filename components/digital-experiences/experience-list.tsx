@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { DigitalExperiencePreview } from "./experience-preview"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface ExperienceListProps {
   experiences: Array<{
@@ -35,6 +36,7 @@ interface ExperienceListProps {
 
 export function ExperienceList({ experiences, canEdit = false }: ExperienceListProps) {
   const [previewExperience, setPreviewExperience] = useState<any>(null)
+  const router = useRouter()
 
   const getIcon = (type: string, platform?: string) => {
     if (platform === "Twitter") return <Twitter className="h-4 w-4 text-blue-400" />
@@ -130,7 +132,7 @@ export function ExperienceList({ experiences, canEdit = false }: ExperienceListP
                             <Eye className="mr-2 h-4 w-4" />
                             Preview
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/digital-experiences/${experience.id}/edit`)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>

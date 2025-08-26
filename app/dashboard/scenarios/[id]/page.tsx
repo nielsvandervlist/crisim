@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Target, Clock, User, Calendar, Edit, Play, Plus } from "lucide-react"
+import { Target, Clock, User, Calendar, Edit, Play, Plus, FileText } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ExperienceList } from "@/components/digital-experiences/experience-list"
+import { DocumentsSection } from "@/components/documents/documents-section"
 
 interface ScenarioPageProps {
   params: {
@@ -49,12 +50,6 @@ export default async function ScenarioPage({ params }: ScenarioPageProps) {
     `)
     .eq("id", awaitedParams.id)
     .single()
-
-  // Debug logging
-  console.log("Scenario ID:", awaitedParams.id)
-  console.log("Organization ID:", profile.organization_id)
-  console.log("Scenario data:", scenario)
-  console.log("Error:", error)
 
   if (error) {
     console.error("Database error:", error)
@@ -192,6 +187,9 @@ export default async function ScenarioPage({ params }: ScenarioPageProps) {
               <ExperienceList experiences={transformedExperiences} canEdit={true} />
             </CardContent>
           </Card>
+
+          {/* Documents */}
+          <DocumentsSection scenarioId={scenario.id} canEdit={true} />
         </div>
 
         {/* Sidebar */}
@@ -238,6 +236,10 @@ export default async function ScenarioPage({ params }: ScenarioPageProps) {
                   Add Digital Experience
                 </Button>
               </Link>
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                <FileText className="mr-2 h-4 w-4" />
+                Upload Document
+              </Button>
               <Link href={`/dashboard/sessions/new?scenario=${scenario.id}`}>
                 <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
                   <Play className="mr-2 h-4 w-4" />

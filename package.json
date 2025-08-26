@@ -49,6 +49,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "dotenv": "^17.2.1",
     "embla-carousel-react": "8.5.1",
     "geist": "^1.3.1",
     "input-otp": "1.4.1",
@@ -69,14 +70,18 @@
     "zod": "3.25.67"
   },
   "devDependencies": {
+    "@snaplet/copycat": "^6.0.0",
+    "@snaplet/seed": "0.98.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/nodemailer": "^6.4.14",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19",
-    "tsx": "^4.19.2",
     "@types/react-dom": "^19",
+    "pg": "^8.16.3",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
+    "tsx": "^4.19.2",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
   }

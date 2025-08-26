@@ -98,20 +98,22 @@ export function CreateDigitalExperienceForm() {
   return (
     <form action={formAction} className="space-y-4">
       {state?.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm flex items-center gap-2">
+          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
           {state.error}
         </div>
       )}
 
       {state?.success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md text-sm">
+        <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md text-sm flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           {state.success}
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
-          <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
             Experience Type *
           </label>
           <Select
@@ -124,7 +126,7 @@ export function CreateDigitalExperienceForm() {
             }}
             required
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-10">
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
@@ -138,11 +140,11 @@ export function CreateDigitalExperienceForm() {
         </div>
 
         <div>
-          <label htmlFor="urgencyLevel" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="urgencyLevel" className="block text-sm font-medium text-gray-700 mb-2">
             Urgency Level *
           </label>
           <Select name="urgencyLevel" value={urgencyLevel} onValueChange={setUrgencyLevel} required>
-            <SelectTrigger>
+            <SelectTrigger className="h-10">
               <SelectValue placeholder="Select urgency" />
             </SelectTrigger>
             <SelectContent>
@@ -238,7 +240,9 @@ export function CreateDigitalExperienceForm() {
         <input type="hidden" name="urgencyLevel" value={urgencyLevel} />
       </div>
 
-      <SubmitButton />
+      <div className="pt-2">
+        <SubmitButton />
+      </div>
     </form>
   )
 }

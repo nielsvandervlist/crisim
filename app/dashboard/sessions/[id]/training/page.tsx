@@ -46,14 +46,14 @@ export default async function TrainingPage({ params }: TrainingPageProps) {
 
   // Check if user has access to this session
   const isTrainer = ["admin", "trainer"].includes(profile.role)
-  const isParticipant = session.session_participants?.some((p: any) => p.participant_id === profile.id)
+  const isParticipant = session.session_participants?.some((p: any) => p.participant_id === profile.user_id)
 
   if (!isTrainer && !isParticipant) {
     notFound()
   }
 
   // Get participant's role assignment
-  const participantData = session.session_participants?.find((p: any) => p.participant_id === profile.id)
+  const participantData = session.session_participants?.find((p: any) => p.participant_id === profile.user_id)
 
   return (
     <div className="min-h-screen bg-gray-50">

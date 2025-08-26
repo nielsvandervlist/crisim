@@ -51,18 +51,20 @@ export function DigitalExperiencePreview({ experience }: ExperiencePreviewProps)
     switch (type) {
       case "social_media":
         return <MessageCircle className="h-4 w-4 text-blue-500" />
-      case "news_article":
+      case "news":
         return <Newspaper className="h-4 w-4 text-red-600" />
       case "email":
         return <Mail className="h-4 w-4 text-gray-600" />
-      case "website":
+      case "video":
         return <Globe className="h-4 w-4 text-green-600" />
       case "document":
         return <FileText className="h-4 w-4 text-purple-600" />
       case "phone_call":
         return <Phone className="h-4 w-4 text-orange-600" />
-      case "breaking_news":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />
+      case "sms":
+        return <MessageCircle className="h-4 w-4 text-blue-500" />
+      case "press_release":
+        return <FileText className="h-4 w-4 text-red-600" />
       default:
         return <MessageCircle className="h-4 w-4 text-gray-500" />
     }
@@ -146,30 +148,7 @@ export function DigitalExperiencePreview({ experience }: ExperiencePreviewProps)
     )
   }
 
-  const renderBreakingNews = () => (
-    <div className="bg-red-600 text-white border rounded-lg overflow-hidden max-w-lg shadow-lg animate-pulse">
-      <div className="bg-red-700 px-4 py-2">
-        <div className="flex items-center space-x-2">
-          <AlertTriangle className="h-4 w-4 animate-bounce" />
-          <span className="font-bold text-sm">BREAKING NEWS</span>
-          <Badge className="bg-red-800 text-red-100">LIVE</Badge>
-        </div>
-      </div>
-      <div className="p-4">
-        {experience.title && <h3 className="font-bold text-lg mb-2 leading-tight">{experience.title}</h3>}
-        <p className="text-red-100 text-sm leading-relaxed">{experience.content}</p>
-        <div className="mt-3 pt-3 border-t border-red-500">
-          <div className="flex items-center justify-between text-xs">
-            <span>By {experience.author_name || "News Team"}</span>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-red-300 rounded-full animate-pulse"></div>
-              <span>LIVE</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+
 
   const renderNewsArticle = () => {
     const metrics = experience.engagement_metrics || { views: 1247, shares: 89 }
@@ -304,13 +283,13 @@ export function DigitalExperiencePreview({ experience }: ExperiencePreviewProps)
     </div>
   )
 
-  const renderWebsite = () => (
+  const renderVideo = () => (
     <div className="bg-white border rounded-lg overflow-hidden max-w-lg shadow-sm">
-      <div className="bg-blue-600 text-white px-4 py-2">
+      <div className="bg-red-600 text-white px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Globe className="h-4 w-4" />
-            <span className="font-semibold text-sm">{experience.platform || "Website Update"}</span>
+            <span className="font-semibold text-sm">{experience.platform || "Video Content"}</span>
           </div>
           {getUrgencyBadge(experience.urgency_level)}
         </div>
@@ -382,17 +361,19 @@ export function DigitalExperiencePreview({ experience }: ExperiencePreviewProps)
   switch (experience.type) {
     case "social_media":
       return renderSocialMediaPost()
-    case "breaking_news":
-      return renderBreakingNews()
-    case "news_article":
+    case "news":
       return renderNewsArticle()
     case "email":
       return renderEmail()
+    case "video":
+      return renderVideo()
     case "phone_call":
       return renderPhoneCall()
-    case "website":
-      return renderWebsite()
     case "document":
+      return renderDocument()
+    case "sms":
+      return renderSocialMediaPost()
+    case "press_release":
       return renderDocument()
     default:
       return renderDefault()

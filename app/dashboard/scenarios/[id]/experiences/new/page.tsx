@@ -1,10 +1,13 @@
 import { requireRole } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { ExperienceForm } from "@/components/digital-experiences/experience-form"
+import { ExistingExperiencesList } from "@/components/digital-experiences/existing-experiences-list"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Plus, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface NewExperiencePageProps {
   params: {
@@ -43,11 +46,50 @@ export default async function NewExperiencePage({ params }: NewExperiencePagePro
         </Link>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Add Digital Experience</h1>
-          <p className="text-gray-600 mt-2">Create realistic digital content for "{scenario.title}"</p>
+          <p className="text-gray-600 mt-2">Add digital content to "{scenario.title}"</p>
         </div>
       </div>
 
-      <ExperienceForm scenarioId={params.id} />
+      <Tabs defaultValue="existing" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="existing" className="flex items-center gap-2">
+            <List className="h-4 w-4" />
+            Select Existing Experience
+          </TabsTrigger>
+          <TabsTrigger value="create" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Experience
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="existing" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Available Experiences</CardTitle>
+              <CardDescription>
+                Select from existing standalone experiences that can be added to this scenario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* <ExistingExperiencesList scenarioId={params.id} /> */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="create" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Create New Experience</CardTitle>
+              <CardDescription>
+                Create a new digital experience specifically for this scenario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ExperienceForm scenarioId={params.id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
